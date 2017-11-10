@@ -18,8 +18,9 @@ import org.springframework.aop.framework.Advised;
 package org.springframework.data.jpa.repository.query;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.Assert.*;
-import static org.springframework.test.util.ReflectionTestUtils.*;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
+import static org.springframework.test.util.ReflectionTestUtils.getField;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -136,6 +137,42 @@ public class PartTreeJpaQueryIntegrationTests {
 		assertThat(HibernateUtils.getHibernateQuery(getValue(query, PROPERTY)), containsString(".id from User as"));
 	}
 
+
+	@Test // DATAJPA-863
+	public void errorsDueToMismatchOfParametersContainNameOfMethodAndInterface() throws Exception {
+
+		JpaQueryMethod method = getQueryMethod("findByFirstname");
+
+        try {
+
+            new PartTreeJpaQuery(method, entityManager, provider);
+            fail("should have thrown an exception");
+
+        } catch (IllegalStateException ise) {
+
+            assertThat(ise.getMessage(), containsString("findByFirstname"));
+            assertThat(ise.getMessage(), containsString("UserRepository"));
+        }
+	}
+
+	@Test // DATAJPA-863
+	public void errorsDueToMissingPropertyContainNameOfMethodAndInterface() throws Exception {
+
+		JpaQueryMethod method = getQueryMethod("findByNoSuchProperty", String.class);
+
+        try {
+
+            new PartTreeJpaQuery(method, entityManager, provider);
+            fail("should have thrown an exception");
+
+        } catch (IllegalStateException ise) {
+
+            assertThat(ise.getMessage(), containsString("findByNoSuchProperty"));
+            assertThat(ise.getMessage(), containsString(" noSuchProperty "));
+            assertThat(ise.getMessage(), containsString("UserRepository"));
+        }
+	}
+
 	private void testIgnoreCase(String methodName, Object... values) throws Exception {
 
 		Class<?>[] parameterTypes = new Class[values.length];
@@ -192,5 +229,12 @@ public class PartTreeJpaQueryIntegrationTests {
 		boolean existsByFirstname(String firstname);
 
 		List<User> findByCreatedAtAfter(@Temporal(TemporalType.TIMESTAMP) @Param("refDate") Date refDate);
+
+		// Wrong number of parameters
+		User findByFirstname();
+
+		// Wrong property name
+		User findByNoSuchProperty(String x);
 	}
+
 }
